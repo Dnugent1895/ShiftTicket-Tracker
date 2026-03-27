@@ -187,9 +187,10 @@
   .priority-low { color: var(--low); background: var(--low-bg); }
 
   .status-open { color: var(--open); background: #faf5ff; border-color: #e9d5ff; }
-  .status-inqa { color: var(--inqa); background: #eff6ff; border-color: #bfdbfe; }
+  .status-fixed { color: var(--inqa); background: #eff6ff; border-color: #bfdbfe; }
   .status-resolved { color: var(--resolved); background: var(--low-bg); border-color: #bbf7d0; }
   .status-wontfix { color: var(--wontfix); background: #f9fafb; border-color: #d1d5db; }
+  .status-cantduplicate { color: #9333ea; background: #faf5ff; border-color: #e9d5ff; }
 
   .issue-text { max-width: 280px; }
   .resolution-text { max-width: 280px; color: var(--text-muted); }
@@ -661,7 +662,7 @@
 <div class="stats-bar">
   <div class="stat-card"><div class="num" id="stat-total">0</div><div class="label">Total</div></div>
   <div class="stat-card"><div class="num" id="stat-open" style="color:var(--open)">0</div><div class="label">Open</div></div>
-  <div class="stat-card"><div class="num" id="stat-inqa" style="color:var(--inqa)">0</div><div class="label">In QA</div></div>
+  <div class="stat-card"><div class="num" id="stat-fixed" style="color:var(--inqa)">0</div><div class="label">Fixed</div></div>
   <div class="stat-card"><div class="num" id="stat-resolved" style="color:var(--resolved)">0</div><div class="label">Resolved</div></div>
   <div class="stat-card"><div class="num" id="stat-high" style="color:var(--high)">0</div><div class="label">High Priority</div></div>
 </div>
@@ -683,7 +684,7 @@
   <select id="filter-status" onchange="renderTable()">
     <option value="">All Statuses</option>
     <option value="Open">Open</option>
-    <option value="In QA">In QA</option>
+    <option value="Fixed">Fixed</option>
     <option value="Resolved">Resolved</option>
     <option value="Won't Fix">Won't Fix</option>
   </select>
@@ -751,7 +752,7 @@
         <label>Status</label>
         <select id="f-status">
           <option value="Open">Open</option>
-          <option value="In QA">In QA</option>
+          <option value="Fixed">Fixed</option>
           <option value="Resolved">Resolved</option>
           <option value="Won't Fix">Won't Fix</option>
         </select>
@@ -1086,7 +1087,7 @@ function renderTable() {
 
   // Sort
   const priOrder = { High: 0, Medium: 1, Low: 2 };
-  const statusOrder = { Open: 0, 'In QA': 1, Resolved: 2, "Won't Fix": 3 };
+  const statusOrder = { Open: 0, Fixed: 1, Resolved: 2, "Won't Fix": 3, "Can't Duplicate": 4 };
   filtered.sort((a, b) => {
     let va, vb;
     switch (currentSort.col) {
@@ -1174,7 +1175,7 @@ function renderTable() {
 function updateStats() {
   document.getElementById('stat-total').textContent = tickets.length;
   document.getElementById('stat-open').textContent = tickets.filter(t => t.status === 'Open').length;
-  document.getElementById('stat-inqa').textContent = tickets.filter(t => t.status === 'In QA').length;
+  document.getElementById('stat-fixed').textContent = tickets.filter(t => t.status === 'Fixed').length;
   document.getElementById('stat-resolved').textContent = tickets.filter(t => t.status === 'Resolved').length;
   document.getElementById('stat-high').textContent = tickets.filter(t => t.priority === 'High').length;
 }
