@@ -864,29 +864,6 @@ const ticketsRef = db.ref('tickets');
 
 const STORAGE_KEY = 'shiftticket_tracker_data'; // kept as localStorage fallback key
 
-// ─── Twilio SMS Configuration ─────────────────────────────
-const TWILIO_FUNCTION_URL = 'https://shift-ticket-sms-3410-dev.twil.io/send-notification';
-
-// ─── SMS Notification ──────────────────────────────────────
-async function sendSmsNotification(ticket) {
-  if (!TWILIO_FUNCTION_URL) { console.warn('SMS skipped'); return; }
-  try {
-    const response = await fetch(TWILIO_FUNCTION_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: ticket.type, priority: ticket.priority, issue: ticket.issue, status: ticket.status })
-    });
-    const result = await response.json();
-    if (response.ok && result.success) {
-      showNotification('SMS notification sent to Dion & Sushil', 'success');
-    } else {
-      console.warn('SMS send failed:', result.error);
-      showNotification('SMS notification failed', 'warning');
-    }
-  } catch (error) {
-    console.error('Error sending SMS:', error);
-  }
-}
 
 function showNotification(message, type) {
   const toast = document.createElement('div');
@@ -1309,7 +1286,6 @@ function saveTicket() {
   } else {
     const newTicket = { id: nextId++, ...data, comments: [], created: new Date().toISOString().slice(0, 10) };
     tickets.push(newTicket);
-    sendSmsNotification(newTicket);
   }
 
   saveData();
