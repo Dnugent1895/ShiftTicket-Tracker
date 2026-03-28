@@ -191,6 +191,7 @@
   .status-resolved { color: var(--resolved); background: var(--low-bg); border-color: #bbf7d0; }
   .status-wontfix { color: var(--wontfix); background: #f9fafb; border-color: #d1d5db; }
   .status-cantduplicate { color: #9333ea; background: #faf5ff; border-color: #e9d5ff; }
+  .status-cantduplicate { color: #9333ea; background: #faf5ff; border-color: #e9d5ff; }
 
   .issue-text { max-width: 280px; }
   .resolution-text { max-width: 280px; color: var(--text-muted); }
@@ -1071,6 +1072,22 @@ function renderCommentAttachPreview() {
 }
 
 // ─── Rendering ────────────────────────────────────────────
+// ─── Helper Functions ────────────────────────────────────
+function getLastCommentDate(ticket) {
+  if (!ticket.comments || ticket.comments.length === 0) return '';
+  const lastComment = ticket.comments[ticket.comments.length - 1];
+  if (!lastComment.time) return '';
+  const d = new Date(lastComment.time);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return diffDays + ' days ago';
+  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+}
+
 function renderTable() {
   const fType = document.getElementById('filter-type').value;
   const fPriority = document.getElementById('filter-priority').value;
@@ -1097,6 +1114,10 @@ function renderTable() {
       case 'status': va = statusOrder[a.status]; vb = statusOrder[b.status]; break;
       case 'issue': va = a.issue.toLowerCase(); vb = b.issue.toLowerCase(); break;
       case 'resolution': va = a.resolution.toLowerCase(); vb = b.resolution.toLowerCase(); break;
+      case 'lastcomment':
+        va = (a.comments && a.comments.length > 0) ? new Date(a.comments[a.comments.length - 1].time).getTime() : 0;
+        vb = (b.comments && b.comments.length > 0) ? new Date(b.comments[b.comments.length - 1].time).getTime() : 0;
+        break;
       default: va = a.id; vb = b.id;
     }
     if (va < vb) return currentSort.asc ? -1 : 1;
@@ -1108,7 +1129,7 @@ function renderTable() {
   const cardList = document.getElementById('card-list');
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9"><div class="empty-state"><p>No tickets match your filters.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>No tickets match your filters.</p></div></td></tr>';
     cardList.innerHTML = '<div class="empty-state"><p>No tickets match your filters.</p></div>';
   } else {
     // Desktop table rows
@@ -1125,6 +1146,7 @@ function renderTable() {
         <td><span class="badge status-${t.status.toLowerCase().replace(/[' ]/g,'')}">${t.status}</span></td>
         <td><span class="image-count" onclick="openComments(${t.id})">&#128206; ${totalAttach}</span></td>
         <td><span class="comment-count" onclick="openComments(${t.id})">&#128172; ${t.comments.length}</span></td>
+        <td style="font-size:13px;color:var(--text-muted)">${getLastCommentDate(t) || '\u2014'}</td>
         <td class="actions-cell">
           <button class="btn btn-ghost btn-sm" onclick="editTicket(${t.id})">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTicket(${t.id})">Del</button>
