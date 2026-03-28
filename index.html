@@ -698,6 +698,7 @@
     <thead>
       <tr>
         <th data-col="id" onclick="sortBy('id')">ID <span class="sort-icon">&#9650;</span></th>
+        <th data-col="created" onclick="sortBy('created')">Date Created <span class="sort-icon">&#9650;</span></th>
         <th data-col="type" onclick="sortBy('type')">Type <span class="sort-icon">&#9650;</span></th>
         <th data-col="priority" onclick="sortBy('priority')">Priority <span class="sort-icon">&#9650;</span></th>
         <th data-col="issue" onclick="sortBy('issue')">Issue <span class="sort-icon">&#9650;</span></th>
@@ -1109,6 +1110,7 @@ function renderTable() {
     let va, vb;
     switch (currentSort.col) {
       case 'id': va = a.id; vb = b.id; break;
+      case 'created': va = a.created || ''; vb = b.created || ''; break;
       case 'type': va = a.type; vb = b.type; break;
       case 'priority': va = priOrder[a.priority]; vb = priOrder[b.priority]; break;
       case 'status': va = statusOrder[a.status]; vb = statusOrder[b.status]; break;
@@ -1129,7 +1131,7 @@ function renderTable() {
   const cardList = document.getElementById('card-list');
 
   if (filtered.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="10"><div class="empty-state"><p>No tickets match your filters.</p></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="11"><div class="empty-state"><p>No tickets match your filters.</p></div></td></tr>';
     cardList.innerHTML = '<div class="empty-state"><p>No tickets match your filters.</p></div>';
   } else {
     // Desktop table rows
@@ -1139,6 +1141,7 @@ function renderTable() {
       return `
       <tr>
         <td><span class="ticket-id">ST-${String(t.id).padStart(3,'0')}</span></td>
+        <td style="font-size:13px;color:var(--text-muted);white-space:nowrap">${t.created || '—'}</td>
         <td><span class="badge ${t.type === 'Defect' ? 'badge-defect' : 'badge-change'}">${t.type}</span></td>
         <td><span class="badge priority-${t.priority.toLowerCase()}">${t.priority}</span></td>
         <td class="issue-text">${esc(t.issue)}</td>
@@ -1167,6 +1170,10 @@ function renderTable() {
             <span class="badge priority-${t.priority.toLowerCase()}">${t.priority}</span>
             <span class="badge status-${t.status.toLowerCase().replace(/[' ]/g,'')}">${t.status}</span>
           </div>
+        </div>
+        <div class="card-field">
+          <div class="card-field-label">Date Created</div>
+          <div class="card-field-value" style="color:var(--text-muted)">${t.created || '—'}</div>
         </div>
         <div class="card-field">
           <div class="card-field-label">Issue</div>
