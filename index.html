@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -190,7 +191,6 @@
   .status-fixed { color: var(--inqa); background: #eff6ff; border-color: #bfdbfe; }
   .status-resolved { color: var(--resolved); background: var(--low-bg); border-color: #bbf7d0; }
   .status-wontfix { color: var(--wontfix); background: #f9fafb; border-color: #d1d5db; }
-  .status-cantduplicate { color: #9333ea; background: #faf5ff; border-color: #e9d5ff; }
   .status-cantduplicate { color: #9333ea; background: #faf5ff; border-color: #e9d5ff; }
 
   .issue-text { max-width: 280px; }
@@ -632,6 +632,29 @@
     .ticket-card { padding: 12px; }
   }
 
+  /* ─── Toast Notifications ────────────────────── */
+  @keyframes slideIn {
+    from {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideOut {
+    from {
+      transform: translateX(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateX(400px);
+      opacity: 0;
+    }
+  }
+
   /* ─── Print ──────────────────────────────────── */
   @media print {
     .header { position: relative; }
@@ -688,6 +711,7 @@
     <option value="Fixed">Fixed</option>
     <option value="Resolved">Resolved</option>
     <option value="Won't Fix">Won't Fix</option>
+    <option value="Can't Duplicate">Can't Duplicate</option>
   </select>
   <input type="text" id="filter-search" placeholder="Search issues..." oninput="renderTable()">
 </div>
@@ -706,6 +730,7 @@
         <th data-col="status" onclick="sortBy('status')">Status <span class="sort-icon">&#9650;</span></th>
         <th>Attach.</th>
         <th>Comments</th>
+        <th data-col="lastcomment" onclick="sortBy('lastcomment')">Last Comment <span class="sort-icon">&#9650;</span></th>
         <th>Actions</th>
       </tr>
     </thead>
@@ -757,6 +782,7 @@
           <option value="Fixed">Fixed</option>
           <option value="Resolved">Resolved</option>
           <option value="Won't Fix">Won't Fix</option>
+          <option value="Can't Duplicate">Can't Duplicate</option>
         </select>
       </div>
       <div class="form-group">
@@ -864,13 +890,40 @@ const ticketsRef = db.ref('tickets');
 
 const STORAGE_KEY = 'shiftticket_tracker_data'; // kept as localStorage fallback key
 
-
-function showNotification(message, type) {
+// ─── Toast Notification Helper ────────────────────────────
+function showNotification(message, type = 'info') {
   const toast = document.createElement('div');
-  toast.style.cssText = 'position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:6px;font-size:13px;font-weight:500;z-index:9999;max-width:300px;color:white;background:' + (type === 'success' ? '#10b981' : type === 'warning' ? '#f59e0b' : '#3b82f6');
+  toast.style.cssText = `
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    padding: 12px 18px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 9999;
+    animation: slideIn 0.3s ease;
+    max-width: 300px;
+  `;
+
+  if (type === 'success') {
+    toast.style.background = '#10b981';
+    toast.style.color = 'white';
+  } else if (type === 'warning') {
+    toast.style.background = '#f59e0b';
+    toast.style.color = 'white';
+  } else {
+    toast.style.background = '#3b82f6';
+    toast.style.color = 'white';
+  }
+
   toast.textContent = message;
   document.body.appendChild(toast);
-  setTimeout(function() { toast.remove(); }, 3500);
+
+  setTimeout(() => {
+    toast.style.animation = 'slideOut 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
 }
 
 function getDefaultTickets() {
@@ -957,30 +1010,48 @@ if (!loadTicketsLocal()) nextId = 6;
 function saveData() {
   // Save to localStorage as fallback
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets)); } catch(e) {}
-  // Push to Firebase
+  // Don't push to Firebase until we've received the initial snapshot,
+  // otherwise a fresh client can overwrite the shared DB with its local defaults.
+  if (!firebaseInitialized) return;
   try { ticketsRef.set(tickets); } catch(e) { console.warn('Firebase write failed:', e); }
 }
 
 // ─── Firebase real-time sync ──────────────────────────────
 let firebaseInitialized = false;
+function coerceToArray(data) {
+  // Firebase Realtime DB often returns arrays as objects keyed by index,
+  // especially after deletions producing sparse arrays. Normalize both shapes.
+  if (Array.isArray(data)) return data.filter(Boolean);
+  if (data && typeof data === 'object') {
+    return Object.keys(data)
+      .sort((a, b) => Number(a) - Number(b))
+      .map(k => data[k])
+      .filter(Boolean);
+  }
+  return null;
+}
 ticketsRef.on('value', snapshot => {
-  const data = snapshot.val();
-  if (data && Array.isArray(data)) {
+  const raw = snapshot.val();
+  const data = coerceToArray(raw);
+  if (data && data.length > 0) {
     migrateTicketData(data);
     tickets = data;
     nextId = Math.max(...tickets.map(t => t.id)) + 1;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets)); } catch(e) {}
+    firebaseInitialized = true;
     renderTable();
     // If a comments modal is open, refresh it
     if (commentTarget !== null) {
       const t = tickets.find(t => t.id === commentTarget);
       if (t) renderComments(t);
     }
-  } else if (!data && !firebaseInitialized) {
-    // First time: push default/local data to Firebase
+  } else if (!raw && !firebaseInitialized) {
+    // First time ever: seed Firebase with current local data
+    firebaseInitialized = true;
     ticketsRef.set(tickets);
+  } else {
+    firebaseInitialized = true;
   }
-  firebaseInitialized = true;
 });
 
 // ─── Image helpers ────────────────────────────────────────
@@ -1081,7 +1152,6 @@ function renderCommentAttachPreview() {
   countEl.textContent = commentAttachments.length + ' file(s) staged';
 }
 
-// ─── Rendering ────────────────────────────────────────────
 // ─── Helper Functions ────────────────────────────────────
 function getLastCommentDate(ticket) {
   if (!ticket.comments || ticket.comments.length === 0) return '';
@@ -1091,13 +1161,20 @@ function getLastCommentDate(ticket) {
   const now = new Date();
   const diffMs = now - d;
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  // Format: "Mar 26, 2026" or relative like "2 days ago"
   if (diffDays === 0) return 'Today';
   if (diffDays === 1) return 'Yesterday';
   if (diffDays < 7) return diffDays + ' days ago';
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = months[d.getMonth()];
+  const day = d.getDate();
+  const year = d.getFullYear();
+  return month + ' ' + day + ', ' + year;
 }
 
+// ─── Rendering ────────────────────────────────────────────
 function renderTable() {
   const fType = document.getElementById('filter-type').value;
   const fPriority = document.getElementById('filter-priority').value;
@@ -1158,7 +1235,7 @@ function renderTable() {
         <td><span class="badge status-${t.status.toLowerCase().replace(/[' ]/g,'')}">${t.status}</span></td>
         <td><span class="image-count" onclick="openComments(${t.id})">&#128206; ${totalAttach}</span></td>
         <td><span class="comment-count" onclick="openComments(${t.id})">&#128172; ${t.comments.length}</span></td>
-        <td style="font-size:13px;color:var(--text-muted)">${getLastCommentDate(t) || '\u2014'}</td>
+        <td style="font-size:13px;color:var(--text-muted)">${getLastCommentDate(t) || '—'}</td>
         <td class="actions-cell">
           <button class="btn btn-ghost btn-sm" onclick="editTicket(${t.id})">Edit</button>
           <button class="btn btn-danger btn-sm" onclick="deleteTicket(${t.id})">Del</button>
@@ -1191,6 +1268,10 @@ function renderTable() {
         <div class="card-field">
           <div class="card-field-label">Requested Fix</div>
           <div class="card-field-value" style="color:var(--text-muted)">${esc(t.resolution)}</div>
+        </div>
+        <div class="card-field">
+          <div class="card-field-label">Last Comment</div>
+          <div class="card-field-value" style="color:var(--text-muted)">${getLastCommentDate(t) || '—'}</div>
         </div>
         <div class="card-bottom">
           <div class="card-meta">
